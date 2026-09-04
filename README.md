@@ -94,7 +94,7 @@ Si falta alguna variable, la app no arranca y avisa de cuál falta.
 ### 4. Arrancar la API
 
 ```bash
-uvicorn app.main:app --port 8080 --reload
+uvicorn app.main:app --port 8090
 ```
 
 - Documentación interactiva: http://127.0.0.1:8080/docs
