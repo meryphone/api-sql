@@ -5,7 +5,7 @@ API REST para actualizar el enlace de SharePoint de documentos almacenados en SQ
 ## Stack
 
 - **FastAPI** + **Uvicorn**
-- **SQL Server 2022** (vía Docker)
+- **SQL Server 2022** (dockerizado para desarrollo)
 - **pyodbc** para el acceso a datos
 - **pydantic-settings** para la configuración
 
