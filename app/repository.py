@@ -11,6 +11,7 @@ TABLA_DOCUMENTOS = "documentos"
 
 
 def actualizar_documento(documento_id: int, sharepoint_link: str) -> None:
+    "Utiliza un cursor para actualizar el enlace de SharePoint de un documento en la base de datos."
     try:
         with get_cursor() as cursor:
             cursor.execute(
