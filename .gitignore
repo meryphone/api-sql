@@ -2,11 +2,8 @@
 venv/
 .venv/
 
-# Variables de entorno (secretos)
+# Variables de entorno 
 .env
-
-# Datos locales de SQL Server (bind mount de docker-compose)
-data/
 
 # Python
 __pycache__/
@@ -21,3 +18,8 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+*.pem
+*.key
+
+

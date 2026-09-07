@@ -14,24 +14,32 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # --- Conexion a SQL Server ---
-    driver: str
-    server: str
-    database: str
-    uid: str
-    pwd_sql: str
+    # Conexion a SQL Server
+    DRIVER: str
+    SERVER: str
+    DATABASE: str
+    UID: str
+    PWD_SQL: str
 
-    # --- Seguridad ---
-    api_token: str
+    # Seguridad
+    API_TOKEN: str
+
+    # Conexion a SharePoint
+    TENANT_ID: str
+    CLIENT_ID: str
+    CERT_PATH: str
+    CERT_THUMBPRINT: str
+    SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones/Comentarios"
+
 
     @property
     def connection_string(self) -> str:
         return (
-            f"DRIVER={{{self.driver}}};"
-            f"SERVER={self.server};"
-            f"DATABASE={self.database};"
-            f"UID={self.uid};"
-            f"PWD={self.pwd_sql};"
+            f"DRIVER={{{self.DRIVER}}};"
+            f"SERVER={self.SERVER};"
+            f"DATABASE={self.DATABASE};"
+            f"UID={self.UID};"
+            f"PWD={self.PWD_SQL};"
             "TrustServerCertificate=yes;"
         )
 
