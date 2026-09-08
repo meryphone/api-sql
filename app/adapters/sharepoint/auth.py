@@ -6,7 +6,7 @@ from threading import Lock
 
 import msal
 
-from app.core.settings import settings
+from app.config import settings
 
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
 MARGEN_EXPIRACION_SEGUNDOS = 60

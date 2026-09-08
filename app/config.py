@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     CLIENT_ID: str
     CERT_PATH: str
     CERT_THUMBPRINT: str
-    SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones/Comentarios"
+    SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones"
+    BIBLIOTECA_COMENTARIOS: str = "Comentarios"
 
 
     @property

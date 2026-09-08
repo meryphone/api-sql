@@ -1,13 +1,12 @@
 import logging
-from contextlib import asynccontextmanager
 from secrets import compare_digest
 
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
 
 from app import repository
-from app.adapters.sharepoint.client import cerrar_cliente, iniciar_cliente, subir_sharepoint
+from app.adapters.sharepoint.client import subir_sharepoint
 from app.config import settings
-from app.exceptions import EntidadNoEncontrada, RepositorioExcepcion
+from app.exceptions import ArchivoInvalido, EntidadNoEncontrada, RepositorioExcepcion
 from app.schemas import actualizarDocumento
 
 logging.basicConfig(
@@ -18,19 +17,10 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await iniciar_cliente()
-    yield
-    await cerrar_cliente()
-
-
 app = FastAPI(
     title="API de Documentos",
-    description="API para la adición de información sobre documentos de vendedores",
+    description="API que comunica copilot studio y SQL Server para la automatizacion del proceso de comparacion de versiones de documentos de vendedores",
     version="1.0.0",
-    lifespan=lifespan,
 )
 
 router = APIRouter(prefix="/api")
@@ -52,25 +42,25 @@ def actualizar_documento(documento: actualizarDocumento) -> Response:
         repository.actualizar_documento(documento.id, documento.sharepoint_link)
         return Response(status_code=204)
     except EntidadNoEncontrada as e:
-        logger.exception(f"Documento {actualizarDocumento.id} no encontrado en la base de datos")
+        logger.exception(f"Documento {documento.id} no encontrado en la base de datos")
         raise HTTPException(status_code=404, detail=str(e))
     except RepositorioExcepcion as e:
-        logger.exception(f"Error al actualizar el link del documento {actualizarDocumento.id} en la base de datos")
+        logger.exception(f"Error al actualizar el link del documento {documento.id} en la base de datos")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/sharepoint", status_code=204, dependencies=[Depends(verificar_token)])
-async def subir_documento(comprimido: UploadFile = File(...)) -> Response:
-    """Sube el comprimido a SharePoint e inicia el proceso de comparacion."""
+async def subir_documento(archivo: UploadFile = File(...)) -> Response:
+    """Sube el archivo a SharePoint e inicia el proceso de comparacion."""
     try:
-        contenido = await comprimido.read()
-        await subir_sharepoint(comprimido.filename, contenido)
+        contenido = await archivo.read()
+        await subir_sharepoint(archivo.filename, contenido)
         return Response(status_code=204)
-    except ValueError as e:
-        logger.exception(f"Error al subir el documento {comprimido.filename}: {e}")
+    except ArchivoInvalido as e:
+        logger.exception(f"Argumentos invalidos al subir el documento {archivo.filename}: {e}")
         raise HTTPException(status_code=400, detail=f"Error al subir el documento: {e}")
     except Exception as e:
-        logger.exception(f"Error al subir el documento {comprimido.filename} a SharePoint")
+        logger.exception(f"Error al subir el documento {archivo.filename} a SharePoint")
         raise HTTPException(status_code=500, detail=f"Error al subir el documento: {e}")
     
 

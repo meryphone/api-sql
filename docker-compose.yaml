@@ -1,6 +1,3 @@
-# Solo para desarrollo local. No usar en produccion:
-# contrasena de ejemplo, sin TLS ni endurecer. En produccion la API
-# apunta a un SQL Server gestionado configurado via .env.
 services:
   sqlserver:
     container_name: sqlserver
