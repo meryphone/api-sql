@@ -4,10 +4,10 @@ from secrets import compare_digest
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
 
 from app import repository
-from app.adapters.sharepoint.client import subir_sharepoint
+from app.adapters.sharepoint.client import upload_to_sharepoint
 from app.config import settings
-from app.exceptions import ArchivoInvalido, EntidadNoEncontrada, RepositorioExcepcion
-from app.schemas import actualizarDocumento
+from app.exceptions import InvalidFile, EntityNotFound, RepositoryError
+from app.schemas import UpdateDocument
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,51 +18,56 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="API de Documentos",
-    description="API que comunica copilot studio y SQL Server para la automatizacion del proceso de comparacion de versiones de documentos de vendedores",
+    title="Documents API",
+    description="API that connects Copilot Studio and SQL Server to automate the process of comparing versions of vendor documents",
     version="1.0.0",
 )
 
 router = APIRouter(prefix="/api")
 
 
-def verificar_token(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
-    """Rechaza la petición si la cabecera X-API-Key no coincide con el token."""
+def verify_token(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
+    """Reject the request if the X-API-Key header does not match the token."""
     if not x_api_key or not compare_digest(x_api_key, settings.API_TOKEN):
-        logger.warning("Intento de acceso con token inválido o ausente")
-        raise HTTPException(status_code=401, detail="Token inválido")
+        logger.warning("Access attempt with an invalid or missing token")
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 
 
-@router.post("/links", status_code=204, dependencies=[Depends(verificar_token)])
-def actualizar_documento(documento: actualizarDocumento) -> Response:
-    """Actualiza el enlace de SharePoint de un documento en la base de datos."""
+@router.post("/links/{document_id}", status_code=204, dependencies=[Depends(verify_token)])
+def update_document(document_id: int, document: UpdateDocument) -> Response:
+    """Update the SharePoint link of a document in the database."""
     try:
-        repository.actualizar_documento(documento.id, documento.sharepoint_link)
+        repository.update_document(document_id, document.sharepoint_link)
         return Response(status_code=204)
-    except EntidadNoEncontrada as e:
-        logger.exception(f"Documento {documento.id} no encontrado en la base de datos")
+    except EntityNotFound as e:
+        logger.exception(f"Document {document_id} not found in the database")
         raise HTTPException(status_code=404, detail=str(e))
-    except RepositorioExcepcion as e:
-        logger.exception(f"Error al actualizar el link del documento {documento.id} en la base de datos")
+    except RepositoryError as e:
+        logger.exception(f"Error updating the link of document {document_id} in the database")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sharepoint", status_code=204, dependencies=[Depends(verificar_token)])
-async def subir_documento(archivo: UploadFile = File(...)) -> Response:
-    """Sube el archivo a SharePoint e inicia el proceso de comparacion."""
+@router.post("/sharepoint", status_code=204, dependencies=[Depends(verify_token)])
+async def upload_document(file: UploadFile = File(...)) -> Response:
+    """Upload the file to SharePoint and start the comparison process."""
     try:
-        contenido = await archivo.read()
-        await subir_sharepoint(archivo.filename, contenido)
+        content = await file.read()
+        await upload_to_sharepoint(file.filename, content)
         return Response(status_code=204)
-    except ArchivoInvalido as e:
-        logger.exception(f"Argumentos invalidos al subir el documento {archivo.filename}: {e}")
-        raise HTTPException(status_code=400, detail=f"Error al subir el documento: {e}")
+    except InvalidFile as e:
+        logger.exception(f"Invalid arguments while uploading document {file.filename}: {e}")
+        raise HTTPException(status_code=400, detail=f"Error uploading the document: {e}")
     except Exception as e:
-        logger.exception(f"Error al subir el documento {archivo.filename} a SharePoint")
-        raise HTTPException(status_code=500, detail=f"Error al subir el documento: {e}")
-    
+        logger.exception(f"Error uploading document {file.filename} to SharePoint")
+        raise HTTPException(status_code=500, detail=f"Error uploading the document: {e}")
+
+
+@router.get("/", status_code=200)
+def health_check() -> dict:
+    """Service health check endpoint."""
+    return {"status": "ok"}
 
 
 app.include_router(router)

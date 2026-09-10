@@ -1,8 +1,8 @@
-# Entorno virtual
+# Virtual environment
 venv/
 .venv/
 
-# Variables de entorno 
+# Environment variables
 .env
 
 # Python
@@ -13,7 +13,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# IDE / SO
+# IDE / OS
 .vscode/
 .idea/
 .DS_Store

@@ -2,8 +2,7 @@
 from fastapi import UploadFile
 from pydantic import BaseModel
 
-class actualizarDocumento(BaseModel):
-    "Clase que representa la estructura de datos para actualizar un documento."
-    id: int
-    sharepoint_link: str
 
+class UpdateDocument(BaseModel):
+    "Data structure used to update an evaluation document in the database."
+    sharepoint_link: str

@@ -1,14 +1,14 @@
 
-class EntidadNoEncontrada(Exception):
-    def __init__(self, mensaje : str):
-        super().__init__(mensaje)
+class EntityNotFound(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
-class RepositorioExcepcion(Exception):
-    def __init__(self, mensaje : str):
-        super().__init__(mensaje)
+class RepositoryError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
 
 
-class ArchivoInvalido(Exception):
-    def __init__(self, mensaje : str):
-        super().__init__(mensaje)
+class InvalidFile(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)

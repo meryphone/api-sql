@@ -1,4 +1,4 @@
-"""Obtención de tokens app-only para Microsoft Graph, cacheados hasta su expiración."""
+"""App-only token retrieval for Microsoft Graph, cached until expiration."""
 
 import asyncio
 import time
@@ -9,49 +9,49 @@ import msal
 from app.config import settings
 
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
-MARGEN_EXPIRACION_SEGUNDOS = 60
+EXPIRATION_MARGIN_SECONDS = 60
 
 _lock = Lock()
-_token_cacheado: str | None = None
-_expira_en = 0.0
+_cached_token: str | None = None
+_expires_at = 0.0
 
 
-def _construir_app_msal() -> msal.ConfidentialClientApplication:
-    """Construye el cliente MSAL con el certificado configurado."""
-    with open(settings.CERT_PATH, "r", encoding="utf-8") as fichero_cert:
-        clave_privada = fichero_cert.read()
+def _build_msal_app() -> msal.ConfidentialClientApplication:
+    """Build the MSAL client with the configured certificate."""
+    with open(settings.CERT_PATH, "r", encoding="utf-8") as cert_file:
+        private_key = cert_file.read()
 
     return msal.ConfidentialClientApplication(
         client_id=settings.CLIENT_ID,
         authority=f"https://login.microsoftonline.com/{settings.TENANT_ID}",
         client_credential={
-            "private_key": clave_privada,
+            "private_key": private_key,
             "thumbprint": settings.CERT_THUMBPRINT,
         },
     )
 
 
-async def obtener_token() -> str:
-    """Devuelve un token de Graph, reutilizando el cacheado si sigue vigente."""
-    global _token_cacheado, _expira_en
+async def get_token() -> str:
+    """Return a Graph token, reusing the cached one while it is still valid."""
+    global _cached_token, _expires_at
 
-    def _procesar():
-        global _token_cacheado, _expira_en
+    def _acquire():
+        global _cached_token, _expires_at
 
         with _lock:
-            if _token_cacheado and time.monotonic() < _expira_en:
-                return _token_cacheado
+            if _cached_token and time.monotonic() < _expires_at:
+                return _cached_token
 
-            app = _construir_app_msal()
-            resultado = app.acquire_token_for_client(scopes=GRAPH_SCOPE)
+            app = _build_msal_app()
+            result = app.acquire_token_for_client(scopes=GRAPH_SCOPE)
 
-            if "access_token" not in resultado:
+            if "access_token" not in result:
                 raise RuntimeError(
-                    f"No se pudo obtener el token de Graph: {resultado.get('error_description', resultado)}"
+                    f"Could not obtain the Graph token: {result.get('error_description', result)}"
                 )
 
-            _token_cacheado = resultado["access_token"]
-            _expira_en = time.monotonic() + resultado.get("expires_in", 0) - MARGEN_EXPIRACION_SEGUNDOS
-            return _token_cacheado
+            _cached_token = result["access_token"]
+            _expires_at = time.monotonic() + result.get("expires_in", 0) - EXPIRATION_MARGIN_SECONDS
+            return _cached_token
 
-    return await asyncio.to_thread(_procesar)
+    return await asyncio.to_thread(_acquire)

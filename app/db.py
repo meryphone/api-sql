@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def get_cursor():
-    """Entrega un cursor con su propia conexion del pool."""
+    """Yield a cursor backed by its own connection from the pool."""
     connection = pyodbc.connect(settings.connection_string)
     try:
         cursor = connection.cursor()

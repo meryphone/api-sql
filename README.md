@@ -1,61 +1,61 @@
 # api-sql
 
-API REST para subir documentos comprimidos a SharePoint (Microsoft Graph) e
-iniciar el proceso de comparacion, y para actualizar el enlace resultante de
-un documento en SQL Server.
+REST API to upload compressed documents to SharePoint (Microsoft Graph) and
+start the comparison process, and to update the resulting link of a document
+in SQL Server.
 
 ## Stack
 
 - **FastAPI** + **Uvicorn**
-- **SQL Server 2022** (dockerizado para desarrollo)
-- **pyodbc** para el acceso a datos
-- **httpx** + **MSAL** para la subida a SharePoint vía Microsoft Graph (auth app-only con certificado)
-- **pydantic-settings** para la configuración
+- **SQL Server 2022** (dockerized for development)
+- **pyodbc** for data access
+- **httpx** + **MSAL** for uploading to SharePoint via Microsoft Graph (app-only auth with certificate)
+- **pydantic-settings** for configuration
 
-## Estructura
+## Structure
 
 ```
 app/
-  config.py                    # Settings (pydantic-settings): lee y valida el .env
-  db.py                        # get_cursor(): conexión + transacción + cierre por operación
-  repository.py                # actualizar_documento(): acceso a la tabla documentos
-  exceptions.py                # EntidadNoEncontrada, RepositorioExcepcion
-  schemas.py                   # modelos de entrada (Pydantic)
-  main.py                      # app FastAPI, router, auth por cabecera y logging
+  config.py                    # Settings (pydantic-settings): reads and validates the .env
+  db.py                        # get_cursor(): connection + transaction + close per operation
+  repository.py                # update_document(): access to the documentos table
+  exceptions.py                # EntityNotFound, RepositoryError
+  schemas.py                   # input models (Pydantic)
+  main.py                      # FastAPI app, router, header auth and logging
   adapters/
     sharepoint/
-      auth.py                  # obtener_token(): token app-only de Graph, cacheado
-      client.py                # subir_sharepoint(): sube el fichero a la biblioteca configurada
+      auth.py                  # get_token(): app-only Graph token, cached
+      client.py                # upload_to_sharepoint(): uploads the file to the configured library
 docker-compose.yaml
 requirements.txt
 .env.example
 ```
 
-## Requisitos previos
+## Prerequisites
 
 - Python 3.11+
 - Docker Desktop
-- Un driver ODBC para SQL Server. Por defecto se usa `SQL Server` (el que trae Windows).
-  Para el moderno instala [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server)
-  y ajusta `DRIVER` en el `.env`.
-- Un registro de aplicación en Microsoft Entra ID con permiso app-only
-  (`Sites.ReadWrite.All` o similar) sobre Microsoft Graph, autenticado con
-  certificado (no se usa client secret).
+- An ODBC driver for SQL Server. By default `SQL Server` is used (the one bundled with Windows).
+  For the modern one, install [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server)
+  and adjust `DRIVER` in the `.env`.
+- An application registration in Microsoft Entra ID with app-only permission
+  (`Sites.ReadWrite.All` or similar) over Microsoft Graph, authenticated with
+  a certificate (no client secret is used).
 
-## Puesta en marcha
+## Getting started
 
-### 1. Base de datos
+### 1. Database
 
-> **Solo para desarrollo local.** El `docker-compose.yaml` monta un SQL Server con
-> contraseña de ejemplo y sin endurecer; no debe usarse en producción. En producción
-> la API apunta a un SQL Server gestionado aparte, configurado mediante el `.env`.
+> **Local development only.** The `docker-compose.yaml` spins up a SQL Server with
+> a sample password and no hardening; it must not be used in production. In production
+> the API points to a SQL Server managed separately, configured through the `.env`.
 
 ```bash
 docker compose up -d
 ```
 
-Levanta SQL Server en `localhost:1433` (usuario `sa`, contraseña la de `MSSQL_SA_PASSWORD`
-en `docker-compose.yaml`). Crea la base de datos y la tabla:
+Brings up SQL Server at `localhost:1433` (user `sa`, password the one from `MSSQL_SA_PASSWORD`
+in `docker-compose.yaml`). Create the database and the table:
 
 ```sql
 CREATE DATABASE vendedores;
@@ -68,161 +68,166 @@ CREATE TABLE documentos (
 );
 ```
 
-### 2. Entorno Python
+### 2. Python environment
 
 ```bash
 python -m venv venv
-venv\Scripts\activate        # PowerShell/CMD;  en bash: source venv/bin/activate
+venv\Scripts\activate        # PowerShell/CMD;  in bash: source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-### 3. Configuración
+### 3. Configuration
 
 ```bash
-copy .env.example .env       # en bash: cp .env.example .env
+copy .env.example .env       # in bash: cp .env.example .env
 ```
 
-Edita `.env`:
+Edit `.env`:
 
-| Variable          | Descripción                                    | Ejemplo                     |
+| Variable          | Description                                     | Example                     |
 |-------------------|-------------------------------------------------|-----------------------------|
-| `DRIVER`          | Nombre del driver ODBC                         | `SQL Server`                |
-| `SERVER`          | Host del servidor                              | `localhost`                 |
-| `DATABASE`        | Base de datos                                  | `vendedores`                |
-| `UID`             | Usuario                                        | `sa`                        |
-| `PWD_SQL`         | Contraseña                                     | `YourStrong!Passw0rd`       |
-| `API_TOKEN`       | Token para la cabecera `X-API-Key`             | *(ver abajo)*                |
-| `TENANT_ID`       | Id del tenant de Microsoft Entra ID            | *(GUID)*                     |
-| `CLIENT_ID`       | Id de la app registrada                        | *(GUID)*                     |
-| `CERT_PATH`       | Ruta al certificado (clave privada, PEM)       | `certs/sharepoint.pem`       |
-| `CERT_THUMBPRINT` | Huella del certificado subido a la app         | *(hex)*                      |
-| `SHAREPOINT_URL`  | Ruta de la biblioteca destino. Opcional, tiene valor por defecto en `config.py` | `https://.../DesarrolloAutomatizaciones/Comentarios` |
+| `DRIVER`          | ODBC driver name                                | `SQL Server`                |
+| `SERVER`          | Server host                                     | `localhost`                 |
+| `DATABASE`        | Database                                        | `vendedores`                |
+| `UID`             | User                                            | `sa`                        |
+| `PWD_SQL`         | Password                                        | `YourStrong!Passw0rd`       |
+| `API_TOKEN`       | Token for the `X-API-Key` header               | *(see below)*                |
+| `TENANT_ID`       | Microsoft Entra ID tenant id                   | *(GUID)*                     |
+| `CLIENT_ID`       | Registered app id                              | *(GUID)*                     |
+| `CERT_PATH`       | Path to the certificate (private key, PEM)     | `certs/sharepoint.pem`       |
+| `CERT_THUMBPRINT` | Thumbprint of the certificate uploaded to the app | *(hex)*                   |
+| `SHAREPOINT_URL`  | Path of the target library. Optional, has a default value in `config.py` | `https://.../DesarrolloAutomatizaciones/Comentarios` |
 
-Genera el token:
+Generate the token:
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Si falta alguna variable obligatoria, la app no arranca y avisa de cuál falta.
+If any required variable is missing, the app does not start and reports which one is missing.
 
-### 4. Arrancar la API
+### 4. Start the API
 
 ```bash
 uvicorn app.main:app --port 8090
 ```
 
-- Documentación interactiva: http://127.0.0.1:8090/docs
+- Interactive docs: http://127.0.0.1:8090/docs
 
 ## Endpoints
 
-Todos requieren la cabecera `X-API-Key` con el valor de `API_TOKEN`.
+All of them require the `X-API-Key` header with the value of `API_TOKEN`.
 
 ### `POST /api/sharepoint`
 
-Sube un fichero comprimido a la biblioteca de SharePoint configurada e inicia
-el proceso de comparación. No toca la base de datos.
+Uploads a compressed file to the configured SharePoint library and starts
+the comparison process. It does not touch the database.
 
-**Cabeceras**
+**Headers**
 
-| Cabecera        | Valor                       |
+| Header          | Value                       |
 |-----------------|-----------------------------|
 | `Content-Type`  | `multipart/form-data`       |
-| `X-API-Key`     | el valor de `API_TOKEN`     |
+| `X-API-Key`     | the value of `API_TOKEN`    |
 
-**Cuerpo**: form-data con el campo `comprimido` (el fichero).
+**Body**: form-data with the `file` field (the file).
 
-**Respuestas**
+**Responses**
 
-| Código | Cuándo                                              |
+| Code   | When                                                 |
 |--------|------------------------------------------------------|
-| `204`  | Fichero subido correctamente                          |
-| `400`  | Fichero vacío o supera el límite de 512 MB            |
-| `401`  | Falta la cabecera `X-API-Key` o el token no coincide  |
-| `422`  | Falta el fichero en el cuerpo de la petición          |
-| `500`  | Error al subir a SharePoint (Graph/red)               |
+| `204`  | File uploaded successfully                            |
+| `400`  | Empty file or larger than the 512 MB limit           |
+| `401`  | Missing `X-API-Key` header or token does not match   |
+| `422`  | Missing file in the request body                     |
+| `500`  | Error uploading to SharePoint (Graph/network)        |
 
-**Ejemplo (curl / Git Bash)**
+**Example (curl / Git Bash)**
 
 ```bash
 curl -i -X POST http://127.0.0.1:8090/api/sharepoint \
   -H "X-API-Key: <API_TOKEN>" \
-  -F "comprimido=@documento.zip"
+  -F "file=@document.zip"
 ```
 
-### `POST /api/links`
+### `POST /api/links/{id}`
 
-Actualiza el `sharepoint_link` de un documento existente en la base de datos
-(normalmente, con el resultado del proceso iniciado por `/api/sharepoint`).
+Updates the `sharepoint_link` of an existing document in the database
+(normally with the result of the process started by `/api/sharepoint`).
 
-**Cabeceras**
+**Path parameters**
 
-| Cabecera        | Valor                       |
+| Parameter | Type  | Description                     |
+|-----------|-------|--------------------------------|
+| `id`      | `int` | Id of the document to update   |
+
+**Headers**
+
+| Header          | Value                       |
 |-----------------|-----------------------------|
 | `Content-Type`  | `application/json`          |
-| `X-API-Key`     | el valor de `API_TOKEN`     |
+| `X-API-Key`     | the value of `API_TOKEN`    |
 
-**Cuerpo**
+**Body**
 
 ```json
 {
-  "id": 1,
   "sharepoint_link": "https://sharepoint/doc1"
 }
 ```
 
-**Respuestas**
+**Responses**
 
-| Código | Cuándo                                            |
+| Code   | When                                             |
 |--------|--------------------------------------------------|
-| `204`  | Documento actualizado                             |
-| `401`  | Falta la cabecera `X-API-Key` o el token no coincide |
-| `404`  | No existe ningún documento con ese `id`           |
-| `422`  | Cuerpo inválido (falta un campo o tipo incorrecto) |
-| `500`  | Error de base de datos                            |
+| `204`  | Document updated                                 |
+| `401`  | Missing `X-API-Key` header or token does not match |
+| `404`  | No document exists with that `id`                |
+| `422`  | Invalid body (missing field or wrong type)       |
+| `500`  | Database error                                   |
 
-**Ejemplo (curl / Git Bash)**
+**Example (curl / Git Bash)**
 
 ```bash
-curl -i -X POST http://127.0.0.1:8090/api/links \
+curl -i -X POST http://127.0.0.1:8090/api/links/1 \
   -H "Content-Type: application/json" \
   -H "X-API-Key: <API_TOKEN>" \
-  -d '{"id": 1, "sharepoint_link": "https://sharepoint/doc1"}'
+  -d '{"sharepoint_link": "https://sharepoint/doc1"}'
 ```
 
-**Ejemplo (PowerShell)**
+**Example (PowerShell)**
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8090/api/links `
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8090/api/links/1 `
   -Headers @{ "X-API-Key" = "<API_TOKEN>" } `
   -ContentType application/json `
-  -Body '{"id": 1, "sharepoint_link": "https://sharepoint/doc1"}'
+  -Body '{"sharepoint_link": "https://sharepoint/doc1"}'
 ```
 
 ## Logging
 
-Configurado en `main.py` a nivel `INFO`, formato `fecha nivel logger: mensaje`.
+Configured in `main.py` at `INFO` level, format `date level logger: message`.
 
-| Evento                              | Nivel     | Origen           |
+| Event                                | Level     | Source           |
 |--------------------------------------|-----------|------------------|
-| Documento actualizado                | `INFO`    | `app.repository` |
-| Documento inexistente al actualizar  | `WARNING` | `app.repository` |
-| Token inválido o ausente             | `WARNING` | `app.main`       |
-| Error de base de datos               | `ERROR` (con traceback) | `app.repository` |
-| Fichero inválido (vacío / demasiado grande) | `ERROR` (con traceback) | `app.main` |
-| Error al subir a SharePoint          | `ERROR` (con traceback) | `app.main`       |
+| Document updated                     | `INFO`    | `app.repository` |
+| Non-existent document on update      | `WARNING` | `app.repository` |
+| Invalid or missing token             | `WARNING` | `app.main`       |
+| Database error                       | `ERROR` (with traceback) | `app.repository` |
+| Invalid file (empty / too large)     | `ERROR` (with traceback) | `app.main` |
+| Error uploading to SharePoint        | `ERROR` (with traceback) | `app.main`       |
 
-## Notas
+## Notes
 
-- Cada petición a la base de datos abre y cierra su propia conexión; pyodbc
-  reutiliza las del pool del driver ODBC, así que es seguro bajo carga concurrente.
-- El cliente HTTP hacia Microsoft Graph (`app/adapters/sharepoint/client.py`) es un
-  único `httpx.AsyncClient` compartido por todo el proceso, para reutilizar
-  conexiones entre subidas en vez de abrir una nueva por petición.
-- El token de Graph se cachea en memoria hasta que expira (`app/adapters/sharepoint/auth.py`);
-  las peticiones concurrentes reutilizan el mismo token en vez de pedir uno cada una.
-- En `/api/sharepoint`, el 400 solo se devuelve para `ArchivoInvalido` (fichero vacío
-  o mayor de 512 MB) — cualquier otro fallo (config de MSAL, red, Graph caído) cae en
-  el 500 genérico. Evita capturar `ValueError` a secas ahí: MSAL también lo usa para
-  errores de configuración (p.ej. `TENANT_ID` mal puesto), y con `except ValueError`
-  esos errores de servidor se devolvían como si fueran un 400 del cliente.
+- Each database request opens and closes its own connection; pyodbc
+  reuses those from the ODBC driver pool, so it is safe under concurrent load.
+- The HTTP client towards Microsoft Graph (`app/adapters/sharepoint/client.py`) is a
+  single `httpx.AsyncClient` shared by the whole process, to reuse
+  connections between uploads instead of opening a new one per request.
+- The Graph token is cached in memory until it expires (`app/adapters/sharepoint/auth.py`);
+  concurrent requests reuse the same token instead of each requesting one.
+- In `/api/sharepoint`, the 400 is only returned for `InvalidFile` (empty file
+  or larger than 512 MB) — any other failure (MSAL config, network, Graph down) falls
+  into the generic 500. Avoid catching a bare `ValueError` there: MSAL also uses it for
+  configuration errors (e.g. a misconfigured `TENANT_ID`), and with `except ValueError`
+  those server errors were returned as if they were a client 400.

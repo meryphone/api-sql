@@ -1,4 +1,4 @@
-"""Configuracion centralizada: lee y valida las variables de entorno."""
+"""Centralized configuration: reads and validates the environment variables."""
 
 from pathlib import Path
 
@@ -14,23 +14,23 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Conexion a SQL Server
+    # SQL Server connection
     DRIVER: str
     SERVER: str
     DATABASE: str
     UID: str
     PWD_SQL: str
 
-    # Seguridad
+    # Security
     API_TOKEN: str
 
-    # Conexion a SharePoint
+    # SharePoint connection
     TENANT_ID: str
     CLIENT_ID: str
     CERT_PATH: str
     CERT_THUMBPRINT: str
     SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones"
-    BIBLIOTECA_COMENTARIOS: str = "Comentarios"
+    COMMENTS_LIBRARY: str = "Comentarios"
 
 
     @property
