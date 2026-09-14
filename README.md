@@ -90,13 +90,14 @@ Edit `.env`:
 | `SERVER`          | Server host                                     | `localhost`                 |
 | `DATABASE`        | Database                                        | `vendedores`                |
 | `UID`             | User                                            | `sa`                        |
-| `PWD_SQL`         | Password                                        | `YourStrong!Passw0rd`       |
+| `PWD_SQL`         | Password                                        | `yourpassword`       |
 | `API_TOKEN`       | Token for the `X-API-Key` header               | *(see below)*                |
 | `TENANT_ID`       | Microsoft Entra ID tenant id                   | *(GUID)*                     |
 | `CLIENT_ID`       | Registered app id                              | *(GUID)*                     |
 | `CERT_PATH`       | Path to the certificate (private key, PEM)     | `certs/sharepoint.pem`       |
 | `CERT_THUMBPRINT` | Thumbprint of the certificate uploaded to the app | *(hex)*                   |
-| `SHAREPOINT_URL`  | Path of the target library. Optional, has a default value in `config.py` | `https://.../DesarrolloAutomatizaciones/Comentarios` |
+| `SHAREPOINT_URL`  | URL of the SharePoint site                     | `https://<tenant>.sharepoint.com/sites/<site>` |
+| `COMMENTS_LIBRARY`| Name of the target document library            | *(library name)*             |
 
 Generate the token:
 
