@@ -19,7 +19,7 @@ app/
   config.py                    # Settings (pydantic-settings): reads and validates the .env
   db.py                        # get_cursor(): connection + transaction + close per operation
   repository.py                # update_document(): access to the documentos table
-  exceptions.py                # EntityNotFound, RepositoryError
+  exceptions.py                # EntityNotFound, RepositoryError, InvalidFile, GraphError
   schemas.py                   # input models (Pydantic)
   main.py                      # FastAPI app, router, header auth and logging
   adapters/
@@ -63,7 +63,7 @@ GO
 USE vendedores;
 GO
 CREATE TABLE documentos (
-    id              INT IDENTITY(1,1) PRIMARY KEY,
+    id              VARCHAR(50) PRIMARY KEY,
     sharepoint_link VARCHAR(500) NULL
 );
 ```
@@ -110,8 +110,12 @@ If any required variable is missing, the app does not start and reports which on
 ### 4. Start the API
 
 ```bash
-uvicorn app.main:app --port 8090
+python -m app.main
 ```
+
+Starts Uvicorn on port `8090` with `log_config=None`, so its lines use the app's
+logging format. Run it as a module (`-m`) from the project root: `python app/main.py`
+fails because the `app` package is not importable that way.
 
 - Interactive docs: http://127.0.0.1:8090/docs
 
@@ -207,16 +211,28 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8090/api/links/1 `
 
 ## Logging
 
-Configured in `main.py` at `INFO` level, format `date level logger: message`.
+Configured once in `main.py` with `logging.basicConfig`. Every module uses its own
+logger (`logging.getLogger(__name__)`), and all lines share the format
+`date level logger: message` at `INFO` level. `httpx` and `msal` are limited to `WARNING`.
+
+`python -m app.main` starts Uvicorn with `log_config=None`, so it does not install
+its own handlers and its lines (`uvicorn.error`, `uvicorn.access`) propagate to that
+same configuration.
+
+Each error is logged once, in `main.py`, where it is turned into an HTTP response.
 
 | Event                                | Level     | Source           |
 |--------------------------------------|-----------|------------------|
+| Request received (method, path, status) | `INFO` | `uvicorn.access` |
 | Document updated                     | `INFO`    | `app.repository` |
-| Non-existent document on update      | `WARNING` | `app.repository` |
+| File uploaded to SharePoint          | `INFO`    | `app.adapters.sharepoint.client` |
+| Transient Graph error, retrying      | `WARNING` | `app.adapters.sharepoint.client` |
 | Invalid or missing token             | `WARNING` | `app.main`       |
-| Database error                       | `ERROR` (with traceback) | `app.repository` |
-| Invalid file (empty / too large)     | `ERROR` (with traceback) | `app.main` |
-| Error uploading to SharePoint        | `ERROR` (with traceback) | `app.main`       |
+| Non-existent document on update      | `WARNING` | `app.main`       |
+| Invalid file (empty / too large)     | `WARNING` | `app.main`       |
+| Database error                       | `ERROR` (with traceback) | `app.main` |
+| Error uploading to SharePoint        | `ERROR` (with traceback) | `app.main` |
+| Graph token acquired / drive id resolved | `DEBUG` | `app.adapters.sharepoint.*` |
 
 ## Notes
 

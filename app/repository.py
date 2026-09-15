@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 DOCUMENTS_TABLE = "documentos"
 
 
-def update_document(document_id: int, sharepoint_link: str) -> None:
+def update_document(document_id: str, sharepoint_link: str) -> None:
     "Use a cursor to update the SharePoint link of a document in the database."
     try:
         with get_cursor() as cursor:
@@ -20,14 +20,10 @@ def update_document(document_id: int, sharepoint_link: str) -> None:
                 document_id,
             )
             if cursor.rowcount == 0:
-                logger.warning(
-                    "Update skipped: document %s does not exist", document_id
-                )
                 raise EntityNotFound(
                     f"The entity with id {document_id} was not found."
                 )
     except pyodbc.Error as e:
-        logger.exception("Error updating document %s", document_id)
         raise RepositoryError(
             f"Error updating the document with id {document_id}: {e}"
         ) from e

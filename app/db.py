@@ -1,11 +1,8 @@
-import logging
 from contextlib import contextmanager
 
 import pyodbc
 
 from app.config import settings
-
-logger = logging.getLogger(__name__)
 
 
 @contextmanager

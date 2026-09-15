@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import settings
-from app.exceptions import InvalidFile
+from app.exceptions import GraphError, InvalidFile
 from app.adapters.sharepoint.auth import get_token
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ async def _resolve_drive_id(client: httpx.AsyncClient) -> str:
     for drive in response.json()["value"]:
         if drive["name"] == settings.COMMENTS_LIBRARY:
             _drive_id = drive["id"]
+            logger.debug("Resolved drive id for library '%s'", settings.COMMENTS_LIBRARY)
             return _drive_id
 
     raise RuntimeError(
@@ -68,11 +69,22 @@ async def _with_retries(method, *args, **kwargs) -> httpx.Response:
         if response.status_code not in RETRYABLE_STATUS_CODES:
             break
         if attempt < RETRIES - 1:
-            await asyncio.sleep(BACKOFF_BASE_SECONDS * (2 ** attempt))
+            delay = BACKOFF_BASE_SECONDS * (2 ** attempt)
+            logger.warning(
+                "Graph returned %s at %s, retrying in %ss (attempt %s/%s)",
+                response.status_code, _safe_url(response), delay, attempt + 1, RETRIES,
+            )
+            await asyncio.sleep(delay)
     if response.is_error:
-        logger.error("Graph returned %s at %s: %s", response.status_code, response.request.url, response.text)
-    response.raise_for_status()
+        raise GraphError(
+            f"Graph returned {response.status_code} at {_safe_url(response)}: {response.text}"
+        )
     return response
+
+
+def _safe_url(response: httpx.Response) -> str:
+    """Request URL without query string (upload session URLs carry an auth token there)."""
+    return str(response.request.url.copy_with(query=None))
 
 
 async def _upload_small(client: httpx.AsyncClient, filename: str, content: bytes) -> dict:
@@ -125,4 +137,5 @@ async def upload_to_sharepoint(filename: str, content: bytes) -> str:
     else:
         item = await _upload_large(_client, filename, content)
 
+    logger.info("Uploaded %s to SharePoint (%s bytes)", filename, len(content))
     return item["webUrl"]

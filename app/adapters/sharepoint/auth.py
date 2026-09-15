@@ -1,12 +1,15 @@
 """App-only token retrieval for Microsoft Graph, cached until expiration."""
 
 import asyncio
+import logging
 import time
 from threading import Lock
 
 import msal
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
 EXPIRATION_MARGIN_SECONDS = 60
@@ -52,6 +55,7 @@ async def get_token() -> str:
 
             _cached_token = result["access_token"]
             _expires_at = time.monotonic() + result.get("expires_in", 0) - EXPIRATION_MARGIN_SECONDS
+            logger.debug("Acquired new Graph token (expires in %ss)", result.get("expires_in"))
             return _cached_token
 
     return await asyncio.to_thread(_acquire)

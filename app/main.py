@@ -1,6 +1,7 @@
 import logging
 from secrets import compare_digest
 
+import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
 
 from app import repository
@@ -14,6 +15,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+# Noisy libraries: warnings and errors only (httpx INFO lines also expose upload session URLs)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("msal").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +40,16 @@ def verify_token(x_api_key: str | None = Header(default=None, alias="X-API-Key")
 
 
 @router.post("/links/{document_id}", status_code=204, dependencies=[Depends(verify_token)])
-def update_document(document_id: int, document: UpdateDocument) -> Response:
+def update_document(document_id: str, document: UpdateDocument) -> Response:
     """Update the SharePoint link of a document in the database."""
     try:
         repository.update_document(document_id, document.sharepoint_link)
         return Response(status_code=204)
     except EntityNotFound as e:
-        logger.exception(f"Document {document_id} not found in the database")
+        logger.warning("Document %s not found in the database", document_id)
         raise HTTPException(status_code=404, detail=str(e))
     except RepositoryError as e:
-        logger.exception(f"Error updating the link of document {document_id} in the database")
+        logger.exception("Error updating the link of document %s in the database", document_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -57,10 +61,10 @@ async def upload_document(file: UploadFile = File(...)) -> Response:
         await upload_to_sharepoint(file.filename, content)
         return Response(status_code=204)
     except InvalidFile as e:
-        logger.exception(f"Invalid arguments while uploading document {file.filename}: {e}")
+        logger.warning("Rejected document %s: %s", file.filename, e)
         raise HTTPException(status_code=400, detail=f"Error uploading the document: {e}")
     except Exception as e:
-        logger.exception(f"Error uploading document {file.filename} to SharePoint")
+        logger.exception("Error uploading document %s to SharePoint", file.filename)
         raise HTTPException(status_code=500, detail=f"Error uploading the document: {e}")
 
 
@@ -71,3 +75,7 @@ def health_check() -> dict:
 
 
 app.include_router(router)
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, port=8090, log_config=None)
