@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from secrets import compare_digest
 
 import uvicorn
@@ -8,23 +9,30 @@ from app import repository
 from app.adapters.sharepoint.client import upload_to_sharepoint
 from app.config import settings
 from app.exceptions import InvalidFile, EntityNotFound, RepositoryError
+from app.logging_config import setup_logging
 from app.schemas import UpdateDocument
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-# Noisy libraries: warnings and errors only (httpx INFO lines also expose upload session URLs)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("msal").setLevel(logging.WARNING)
-
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Configure logging before serving and report the active settings."""
+    setup_logging()
+    logger.info(
+        "Starting Documents API (log_level=%s, library=%s)",
+        settings.LOG_LEVEL.upper(),
+        settings.COMMENTS_LIBRARY,
+    )
+    yield
+    logger.info("Shutting down Documents API")
+
 
 app = FastAPI(
     title="Documents API",
     description="API that connects Copilot Studio and SQL Server to automate the process of comparing versions of vendor documents",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 router = APIRouter(prefix="/api")

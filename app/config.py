@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones"
     COMMENTS_LIBRARY: str = "Comentarios"
 
+    # Logging (output goes to stdout; systemd/journald handles storage)
+    LOG_LEVEL: str = "INFO"
+
 
     @property
     def connection_string(self) -> str:
