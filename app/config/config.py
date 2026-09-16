@@ -4,7 +4,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+# Resolved from this file, not the working directory, so .env is found no matter
+# where the process is started from (systemd, tests, IDE).
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
@@ -31,10 +33,6 @@ class Settings(BaseSettings):
     CERT_THUMBPRINT: str
     SHAREPOINT_URL: str = "https://intecsaindustrial.sharepoint.com/sites/DesarrolloAutomatizaciones"
     COMMENTS_LIBRARY: str = "Comentarios"
-
-    # Logging (output goes to stdout; systemd/journald handles storage)
-    LOG_LEVEL: str = "INFO"
-
 
     @property
     def connection_string(self) -> str:

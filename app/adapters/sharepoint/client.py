@@ -13,19 +13,24 @@ from app.adapters.sharepoint.auth import get_token
 logger = logging.getLogger(__name__)
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+# Largest file Graph accepts in a single PUT; bigger ones need an upload session.
 SIMPLE_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024
+# Graph requires every chunk except the last to be a multiple of 320 KiB.
 LARGE_UPLOAD_CHUNK_BYTES = 10 * 320 * 1024
+# The whole file is held in memory, so the app sets its own cap far below Graph's.
 MAX_FILE_SIZE_BYTES = 512 * 1024 * 1024
 RETRIES = 3
 BACKOFF_BASE_SECONDS = 1
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
+# Shared client to reuse connections across requests.
 _client = httpx.AsyncClient(timeout=60.0)
+# A library's drive id never changes, so it is looked up once per process.
 _drive_id: str | None = None
 
 
 def _site() -> str:
-    """Build the site identifier that Graph expects."""
+    """Build the site identifier that Graph expects: '{hostname}:{site path}'."""
     parts = urlparse(settings.SHAREPOINT_URL)
     return f"{parts.netloc}:{parts.path.rstrip('/')}"
 
@@ -99,6 +104,7 @@ async def _create_upload_session(client: httpx.AsyncClient, filename: str) -> st
     """Open a ranged upload session and return its URL."""
     root = await _drive_root_url(client)
     url = f"{root}:/{filename}:/createUploadSession"
+    # Overwrite a file with the same name, as the simple upload already does.
     body = {"item": {"@microsoft.graph.conflictBehavior": "replace"}}
     response = await _with_retries(client.post, url, headers=await _headers(), json=body)
     return response.json()["uploadUrl"]
@@ -113,12 +119,15 @@ async def _upload_large(client: httpx.AsyncClient, filename: str, content: bytes
     for start in range(0, total_size, LARGE_UPLOAD_CHUNK_BYTES):
         end = min(start + LARGE_UPLOAD_CHUNK_BYTES, total_size)
         chunk = content[start:end]
+        # No Authorization header: the upload URL is pre-authenticated and Graph
+        # rejects chunk requests that also carry the bearer token.
         headers = {
             "Content-Length": str(len(chunk)),
             "Content-Range": f"bytes {start}-{end - 1}/{total_size}",
         }
         response = await _with_retries(client.put, upload_url, headers=headers, content=chunk)
 
+    # Only the response to the last chunk contains the created item.
     return response.json()
 
 

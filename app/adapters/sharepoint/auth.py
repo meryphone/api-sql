@@ -12,8 +12,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
+# Renew a little early so a token cannot expire in the middle of a request.
 EXPIRATION_MARGIN_SECONDS = 60
 
+# Token acquisition runs in worker threads; the lock makes concurrent requests
+# share one renewal instead of each asking Entra ID for a new token.
 _lock = Lock()
 _cached_token: str | None = None
 _expires_at = 0.0
@@ -58,4 +61,5 @@ async def get_token() -> str:
             logger.debug("Acquired new Graph token (expires in %ss)", result.get("expires_in"))
             return _cached_token
 
+    # MSAL performs blocking HTTP calls, so keep them off the event loop.
     return await asyncio.to_thread(_acquire)

@@ -16,16 +16,21 @@ in SQL Server.
 
 ```
 app/
-  config.py                    # Settings (pydantic-settings): reads and validates the .env
+  config/
+    config.py                  # Settings (pydantic-settings): reads and validates the .env
+    logging.yaml               # logging config passed to uvicorn with --log-config
   db.py                        # get_cursor(): connection + transaction + close per operation
   repository.py                # update_document(): access to the documentos table
   exceptions.py                # EntityNotFound, RepositoryError, InvalidFile, GraphError
   schemas.py                   # input models (Pydantic)
-  main.py                      # FastAPI app, router, header auth and logging
+  main.py                      # FastAPI app, router and header auth
   adapters/
     sharepoint/
       auth.py                  # get_token(): app-only Graph token, cached
       client.py                # upload_to_sharepoint(): uploads the file to the configured library
+deploy/
+  api-sql.service              # systemd unit
+  journald@api-sql.conf        # 7-day log retention for the service's journal namespace
 docker-compose.yaml
 requirements.txt
 .env.example
@@ -109,13 +114,15 @@ If any required variable is missing, the app does not start and reports which on
 
 ### 4. Start the API
 
+From the project root:
+
 ```bash
-python -m app.main
+uvicorn app.main:app --reload --port 8090 --log-config app/config/logging.yaml
 ```
 
-Starts Uvicorn on port `8090` with `log_config=None`, so its lines use the app's
-logging format. Run it as a module (`-m`) from the project root: `python app/main.py`
-fails because the `app` package is not importable that way.
+`--log-config` is required: without it Uvicorn uses its own logging setup and the
+app's `INFO` lines are not printed. In production the service runs through
+systemd with the unit in `deploy/api-sql.service` (same command, without `--reload`).
 
 - Interactive docs: http://127.0.0.1:8090/docs
 
@@ -211,13 +218,19 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8090/api/links/1 `
 
 ## Logging
 
-Configured once in `main.py` with `logging.basicConfig`. Every module uses its own
-logger (`logging.getLogger(__name__)`), and all lines share the format
-`date level logger: message` at `INFO` level. `httpx` and `msal` are limited to `WARNING`.
+Defined in `app/config/logging.yaml` and applied by Uvicorn (`--log-config`) before
+it starts, so every line, Uvicorn's included, uses the format
+`date level logger: message` and goes to stdout. In production journald stores
+the logs and deletes them after 7 days (`deploy/journald@api-sql.conf`). The line
+already carries its date, so read it with `journalctl -o cat` to avoid seeing it twice:
 
-`python -m app.main` starts Uvicorn with `log_config=None`, so it does not install
-its own handlers and its lines (`uvicorn.error`, `uvicorn.access`) propagate to that
-same configuration.
+```bash
+journalctl --namespace=api-sql -u api-sql -o cat -f
+```
+
+Every module uses its own logger (`logging.getLogger(__name__)`). The level is `INFO`;
+to see `DEBUG` lines while developing, change `root.level` in `logging.yaml` (without
+committing it). `httpx`, `httpcore`, `msal`, `urllib3` and `asyncio` are limited to `WARNING`.
 
 Each error is logged once, in `main.py`, where it is turned into an HTTP response.
 
@@ -233,6 +246,7 @@ Each error is logged once, in `main.py`, where it is turned into an HTTP respons
 | Database error                       | `ERROR` (with traceback) | `app.main` |
 | Error uploading to SharePoint        | `ERROR` (with traceback) | `app.main` |
 | Graph token acquired / drive id resolved | `DEBUG` | `app.adapters.sharepoint.*` |
+| SharePoint link of the updated document | `DEBUG` | `app.repository` |
 
 ## Notes
 

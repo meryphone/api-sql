@@ -1,3 +1,8 @@
+"""Domain errors, translated to HTTP responses in app.main.
+
+EntityNotFound -> 404, InvalidFile -> 400, RepositoryError and GraphError -> 500.
+"""
+
 
 class EntityNotFound(Exception):
     def __init__(self, message: str):

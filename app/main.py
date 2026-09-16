@@ -1,38 +1,20 @@
 import logging
-from contextlib import asynccontextmanager
 from secrets import compare_digest
 
-import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
 
 from app import repository
 from app.adapters.sharepoint.client import upload_to_sharepoint
 from app.config import settings
 from app.exceptions import InvalidFile, EntityNotFound, RepositoryError
-from app.logging_config import setup_logging
 from app.schemas import UpdateDocument
 
 logger = logging.getLogger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Configure logging before serving and report the active settings."""
-    setup_logging()
-    logger.info(
-        "Starting Documents API (log_level=%s, library=%s)",
-        settings.LOG_LEVEL.upper(),
-        settings.COMMENTS_LIBRARY,
-    )
-    yield
-    logger.info("Shutting down Documents API")
-
 
 app = FastAPI(
     title="Documents API",
     description="API that connects Copilot Studio and SQL Server to automate the process of comparing versions of vendor documents",
     version="1.0.0",
-    lifespan=lifespan,
 )
 
 router = APIRouter(prefix="/api")
@@ -40,6 +22,7 @@ router = APIRouter(prefix="/api")
 
 def verify_token(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
     """Reject the request if the X-API-Key header does not match the token."""
+    # Constant-time comparison, so response timing does not reveal the token.
     if not x_api_key or not compare_digest(x_api_key, settings.API_TOKEN):
         logger.warning("Access attempt with an invalid or missing token")
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -72,6 +55,8 @@ async def upload_document(file: UploadFile = File(...)) -> Response:
         logger.warning("Rejected document %s: %s", file.filename, e)
         raise HTTPException(status_code=400, detail=f"Error uploading the document: {e}")
     except Exception as e:
+        # Graph, auth and network failures raise different types; none of them is the
+        # client's fault, so they must not surface as a 400.
         logger.exception("Error uploading document %s to SharePoint", file.filename)
         raise HTTPException(status_code=500, detail=f"Error uploading the document: {e}")
 
@@ -83,7 +68,3 @@ def health_check() -> dict:
 
 
 app.include_router(router)
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, port=8090, log_config=None)

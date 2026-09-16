@@ -1,0 +1,32 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  app:
+    format: "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  stdout:
+    class: logging.StreamHandler
+    formatter: app
+    stream: ext://sys.stdout
+
+loggers:
+  uvicorn:
+    level: INFO
+  # Noisy at INFO/DEBUG (httpx lines also expose upload session URLs).
+  httpx:
+    level: WARNING
+  httpcore:
+    level: WARNING
+  msal:
+    level: WARNING
+  urllib3:
+    level: WARNING
+  asyncio:
+    level: WARNING
+
+root:
+  level: INFO
+  handlers: [stdout]
