@@ -17,7 +17,7 @@ in SQL Server.
 ```
 app/
   config/
-    config.py                  # Settings (pydantic-settings): reads and validates the .env
+    settings.py                  # Settings (pydantic-settings): reads and validates the .env
     logging.yaml               # logging config passed to uvicorn with --log-config
   db.py                        # get_cursor(): connection + transaction + close per operation
   repository.py                # update_document(): access to the documentos table
@@ -28,9 +28,6 @@ app/
     sharepoint/
       auth.py                  # get_token(): app-only Graph token, cached
       client.py                # upload_to_sharepoint(): uploads the file to the configured library
-deploy/
-  api-sql.service              # systemd unit
-  journald@api-sql.conf        # 7-day log retention for the service's journal namespace
 docker-compose.yaml
 requirements.txt
 .env.example
