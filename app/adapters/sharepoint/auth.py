@@ -7,12 +7,11 @@ from threading import Lock
 
 import msal
 
-from app.config import settings
+from app.config.config import settings
 
 logger = logging.getLogger(__name__)
 
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
-# Renew a little early so a token cannot expire in the middle of a request.
 EXPIRATION_MARGIN_SECONDS = 60
 
 # Token acquisition runs in worker threads; the lock makes concurrent requests
