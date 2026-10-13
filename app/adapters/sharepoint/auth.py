@@ -7,7 +7,7 @@ from threading import Lock
 
 import msal
 
-from app.config.config import settings
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import pyodbc
 
-from app.config.config import settings
+from app.config.settings import settings
 
 
 @contextmanager

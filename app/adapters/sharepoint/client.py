@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from app.config.config import settings
+from app.config.settings import settings
 from app.exceptions import GraphError, InvalidFile
 from app.adapters.sharepoint.auth import get_token
 
